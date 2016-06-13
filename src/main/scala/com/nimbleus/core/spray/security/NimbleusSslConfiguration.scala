@@ -42,7 +42,7 @@ trait NimbleusSslConfiguration {
     trustManagerFactory.init(keyStore)
 
     val sslContext: SSLContext = SSLContext.getInstance(sslProtocol)
-    sslContext.init(keyManagerFactory.getKeyManagers, trustManagerFactory.getTrustManagers, SecureRandom.getInstanceStrong)
+    sslContext.init(keyManagerFactory.getKeyManagers, trustManagerFactory.getTrustManagers, new SecureRandom)
     val https: HttpsConnectionContext = ConnectionContext.https(sslContext)
     https
   }
