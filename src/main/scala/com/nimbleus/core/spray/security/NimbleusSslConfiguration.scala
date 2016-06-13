@@ -3,11 +3,16 @@ package com.nimbleus.core.spray.security
 import java.io.FileInputStream
 import java.security.{ SecureRandom, KeyStore }
 import javax.net.ssl.{ SSLContext, TrustManagerFactory, KeyManagerFactory }
+import akka.actor.ActorSystem
 import akka.http.scaladsl.{ ConnectionContext, HttpsConnectionContext, Http }
+import com.nimbleus.core.security.SessionStore
 import com.typesafe.config.{ConfigException, ConfigFactory}
 
 // for SSL support (if enabled in application.conf)
 trait NimbleusSslConfiguration {
+  protected def _system: ActorSystem
+  implicit val system = _system
+
   private def getSafeString(key: String) : Option[String] = {
     val config = ConfigFactory.load
     val s = try {
