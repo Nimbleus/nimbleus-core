@@ -19,4 +19,12 @@ trait TokenAuthentication extends Directives {
       }
     }
   }
+
+  def updateUserInSession(user: User) : Boolean = {
+    sessionStore.addSession(user)
+  }
+
+  def terminateSession(token: String) : Boolean = {
+    sessionStore.expireSession(token)
+  }
 }
