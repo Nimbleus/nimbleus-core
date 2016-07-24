@@ -70,6 +70,17 @@ trait UserAuthentication extends Directives {
     }
   }
 
+  def authenticateToken(token: String): Directive1[User] = {
+    sessionStore.getSession(token) match {
+      case Some(user) => {
+        provide(user)
+      }
+      case None => {
+        reject(AuthenticationFailedRejection(CredentialsRejected, challenge))
+      }
+    }
+  }
+
   def updateUserInSession(user: User) : Boolean = {
     sessionStore.addSession(user)
   }
