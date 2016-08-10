@@ -32,6 +32,8 @@
  */
 package com.nimbleus.core.security
 
+import com.nimbleus.core.subscription.UserSubscription
+
 import scala.collection.immutable
 import scala.collection.mutable.ListBuffer
 
@@ -39,9 +41,6 @@ trait UserError
 case class EmailInUse() extends UserError
 case class UnknownUserError(message: String) extends UserError
 case class InvalidUserInfo(message: String) extends UserError
-case class PlanError(message: String) extends UserError
-case class CardError(message: String) extends UserError
-case class InvoiceError(message: String) extends UserError
 
 case class AWSCredentials(awsAccessKeyId: String, awsSecretAccessKey: String, awsKeyPairName: String, awsSecurityGroups: List[String]) {
   def toMap = {
@@ -69,9 +68,9 @@ case class UserDTO(username: String, firstName: String, lastName: String, email:
 }
 
 case class User(cid: String, token: String, username: String, roles: List[String],
-                        firstName: String, lastName: String, email: String, href: String,
-                        customerId: String, plan: SubscriptionPlan.Value,
-                        digitalOceanAccessToken: Option[String], awsCredentials : Option[AWSCredentials]) {
+                firstName: String, lastName: String, email: String, href: String,
+                customerId: String, subscriptionId: Option[String],
+                digitalOceanAccessToken: Option[String], awsCredentials : Option[AWSCredentials]) {
   def isAdmin() : Boolean = {
     roles.contains("administrator")
   }

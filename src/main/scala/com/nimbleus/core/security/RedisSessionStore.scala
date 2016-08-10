@@ -1,7 +1,10 @@
 package com.nimbleus.core.security
 
+import com.nimbleus.core.subscription.{UserCoupon, UserDiscount, UserPlan, UserSubscription}
+import org.joda.time.DateTime
+import org.joda.time.format.ISODateTimeFormat
 import scredis.Redis
-import spray.json.DefaultJsonProtocol
+import spray.json.{DefaultJsonProtocol, DeserializationException, JsString, JsValue, RootJsonFormat}
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -9,18 +12,18 @@ import scala.concurrent.duration._
 
 case class RedisUser(cid: String, token: String, username: String, roles: List[String],
                 firstName: String, lastName: String, email: String, href: String,
-                customerId: String, plan: String, digitalOceanAccessToken: Option[String],
+                customerId: String, subscription: Option[String], digitalOceanAccessToken: Option[String],
                 awsCredentials : Option[AWSCredentials])
 object RedisUser {
   def fromUser(user: User) : RedisUser = {
     RedisUser(Option(user.cid).getOrElse(""), Option(user.token).getOrElse(""), Option(user.username).getOrElse(""), user.roles,
       Option(user.firstName).getOrElse(""), Option(user.lastName).getOrElse(""), Option(user.email).getOrElse(""), Option(user.href).getOrElse(""),
-      Option(user.customerId).getOrElse(""), Option(user.plan.toString).getOrElse(""), user.digitalOceanAccessToken, user.awsCredentials)
+      Option(user.customerId).getOrElse(""), user.subscriptionId, user.digitalOceanAccessToken, user.awsCredentials)
   }
   def toUser(redisUser: RedisUser) : User = {
     User(redisUser.cid, redisUser.token, redisUser.username, redisUser.roles,
       redisUser.firstName, redisUser.lastName, redisUser.email, redisUser.href,
-      redisUser.customerId, SubscriptionPlan.withName(redisUser.plan), redisUser.digitalOceanAccessToken, redisUser.awsCredentials)
+      redisUser.customerId, redisUser.subscription, redisUser.digitalOceanAccessToken, redisUser.awsCredentials)
   }
 }
 
@@ -30,7 +33,32 @@ object RedisSessionStore extends SessionStore {
   val client = Redis(host = config.getString("redis-session-store-url"), port = config.getInt("redis-session-store-port"), passwordOpt = Some(pwd))
 
   object MyUserJsonProtocol extends DefaultJsonProtocol {
+
+    implicit object DateTimeFormat extends RootJsonFormat[DateTime] {
+
+      val formatter = ISODateTimeFormat.basicDateTimeNoMillis
+
+      def write(obj: DateTime): JsValue = {
+        JsString(formatter.print(obj))
+      }
+
+      def read(json: JsValue): DateTime = json match {
+        case JsString(s) => try {
+          formatter.parseDateTime(s)
+        }
+        catch {
+          case t: Throwable => error(s)
+        }
+        case _ =>
+          throw new DeserializationException(json.toString())
+      }
+    }
+
     implicit val AWSCredentialsFormat = jsonFormat4(AWSCredentials.apply)
+    implicit val UserPlanFormat = jsonFormat8(UserPlan.apply)
+    implicit val UserCouponFormat = jsonFormat10(UserCoupon.apply)
+    implicit val UserDiscountFormat = jsonFormat6(UserDiscount.apply)
+    implicit val UserSubscriptionFormat = jsonFormat14(UserSubscription.apply)
     implicit val UserFormat = jsonFormat12(RedisUser.apply)
   }
 

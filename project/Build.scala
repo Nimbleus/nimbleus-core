@@ -1,7 +1,7 @@
 import sbt._
 
 object Versions {
-  val app       = "0.1.3"
+  val app       = "0.2.0"
   val logback   = "1.0.7"
   val ScalaTest = "2.2.6"
   val akka      = "2.4.7"
@@ -13,7 +13,7 @@ object Versions {
   val findbugs = "2.0.1"
   val commonsLang = "3.1"
   val guava = "12.0"
-  val stripe = "1.26.0"
+  val stripe = "2.8.0"
   val jcraftSsh = "0.1.52"
   val stormPath = "1.0.RC9.2"
 }

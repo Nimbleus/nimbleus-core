@@ -33,7 +33,7 @@
 package com.nimbleus.core.security
 
 import com.nimbleus.core.security.User.UserResult
-import scala.concurrent.{Promise, Future}
+import scala.concurrent.{Future, Promise}
 import com.stormpath.sdk.application._
 import com.stormpath.sdk.account._
 import com.stormpath.sdk.authc._
@@ -44,7 +44,7 @@ import com.typesafe.config.{ConfigException, ConfigFactory}
 import com.stormpath.sdk.group.Group
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
-import com.stormpath.sdk.directory.{Directory, CustomData}
+import com.stormpath.sdk.directory.{CustomData, Directory}
 import reactivemongo.bson.BSONObjectID
 import com.stripe.Stripe
 import com.stripe.model._
@@ -61,55 +61,36 @@ object UserManagementService {
   properties.setProperty("apiKey.id", config.getString("security-api-key"))
   properties.setProperty("apiKey.secret", config.getString("security-api-secret"))
   private val apiKey: ApiKey = ApiKeys.builder().setProperties(properties).build()
-  private val client: Client  = Clients.builder().setApiKey(apiKey).build()
+  private val client: Client = Clients.builder().setApiKey(apiKey).build()
   private val applicationHref = config.getString("stormpath-application-href")
   private val directoryHref = config.getString("stormpath-directory-href")
   private val application: Application = client.getResource(applicationHref, classOf[Application])
 
-  // TODO this is a temp fix
-  private def getSafeString(key: String) : String = {
+  private def getSafeString(key: String): String = {
     val s = try {
       config.getString(key)
     }
     catch {
-      case e : ConfigException.Missing  => { "" }
+      case e: ConfigException.Missing => {
+        ""
+      }
     }
     s
   }
-  Stripe.apiKey = getSafeString("stripe-api-key")
 
-  private def getSubscriptionPlan(customerId: String) : SubscriptionPlan.Value = {
-    if (customerId == null) {
-      { SubscriptionPlan.NACREOUS_DEVELOPER }
-    } else {
-      try {
-        println("resolving user subscription")
-        val customer: Customer = Customer.retrieve(customerId)
-        if (customer.getSubscriptions != null) {
-          val subs: CustomerSubscriptionCollection  = customer.getSubscriptions().all(null)
-          if (subs.getCount > 0) {
-            val subscription : Subscription = subs.getData.get(0)
-            SubscriptionPlan.withName(subscription.getPlan.getId)
-          } else { SubscriptionPlan.NACREOUS_DEVELOPER }
-        } else { SubscriptionPlan.NACREOUS_DEVELOPER }
-      }
-      catch {
-        case e: NoSuchElementException => {
-          { SubscriptionPlan.NACREOUS_DEVELOPER }
-        }
-      }
-    }
-  }
+  Stripe.apiKey = getSafeString("stripe-api-key")
 
   def authenticate(username: String, password: String): Option[User] = {
     val request = new UsernamePasswordRequest(username, password)
     try {
       val account: Account = application.authenticateAccount(request).getAccount
-      val groups: List[Group]  = account.getGroups.asScala.toList
+      val groups: List[Group] = account.getGroups.asScala.toList
       var roles: collection.mutable.ListBuffer[String] = ListBuffer()
-      for (g <- groups) {roles.append(g.getName)}
+      for (g <- groups) {
+        roles.append(g.getName)
+      }
       // handle edge case of now unique id associated with the user
-      val customData: CustomData  = account.getCustomData()
+      val customData: CustomData = account.getCustomData()
       val cid: String = customData.get(CLIENT_ID).asInstanceOf[String]
       val customerId: String = customData.get(CUSTOMER_ID).asInstanceOf[String]
       val digitalOceanAccessToken: Option[String] = Option(customData.get(DIGITAL_OCEAN_ACCESS_TOKEN).asInstanceOf[String])
@@ -135,19 +116,23 @@ object UserManagementService {
       } else {
         cid
       }
+      // TODO handle subscription
       Some(User(saveId, User.getToken, account.getUsername, roles.toList, account.getGivenName,
-        account.getSurname, account.getEmail, account.getHref, customerId, getSubscriptionPlan(customerId),
-        digitalOceanAccessToken, Some(awsCredentials)))}
+        account.getSurname, account.getEmail, account.getHref, customerId, None,
+        digitalOceanAccessToken, Some(awsCredentials)))
+    }
     catch {
-      case e: ResourceException  => {
+      case e: ResourceException => {
         println(e.getMessage)
         None // authentication failed
       }
     }
-    finally {request.clear()}
+    finally {
+      request.clear()
+    }
   }
 
-  def createUser(user: UserDTO, password: String) : Future[UserResult] = {
+  def createUser(user: UserDTO, password: String): Future[UserResult] = {
     val result = Promise[UserResult]
     user.validateUserInfo(password) match {
       case Some(errors) => {
@@ -174,14 +159,14 @@ object UserManagementService {
             val customData: CustomData = account.getCustomData()
             val newCid = BSONObjectID.generate.stringify
             customData.put(CLIENT_ID, newCid)
-            // create a subscription for this new user
-            val customerWithPlanParams : Map[String, Object] = Map("email" -> user.email, "plan" -> SubscriptionPlan.NACREOUS_DEVELOPER.toString)
-            val customer : Customer = Customer.create(customerWithPlanParams)
+            // create a payment cusotmer account for this new user
+            val customerWithParams: Map[String, Object] = Map("email" -> user.email)
+            val customer: Customer = Customer.create(customerWithParams)
             customData.put(CUSTOMER_ID, customer.getId)
             customData.save
             result.success(Right(User(newCid, User.getToken, account.getUsername, List.empty, account.getGivenName,
               account.getSurname, account.getEmail, account.getHref, customer.getId,
-              SubscriptionPlan.NACREOUS_DEVELOPER, None, None)))
+              None, None, None)))
           }
         }
         catch {
@@ -195,8 +180,22 @@ object UserManagementService {
     result.future
   }
 
-  // TODO this really is not a future
-  def deleteUser(user: User) : Future[Boolean] = {
+  def accountExists(user: User) : Future[Boolean] = {
+    val result = Promise[Boolean]
+    try {
+      val account: Account = client.getResource(user.href, classOf[Account])
+      result.success(true)
+    }
+    catch {
+      case e: Throwable => {
+        println(e.getMessage)
+        result.success(false)
+      }
+    }
+    result.future
+  }
+
+  def deleteUser(user: User): Future[Boolean] = {
     val result = Promise[Boolean]
     try {
       val account: Account = client.getResource(user.href, classOf[Account])
@@ -209,7 +208,9 @@ object UserManagementService {
           customer.delete
         }
         catch {
-          case e : Throwable => {println(e.getMessage)}
+          case e: Throwable => {
+            println(e.getMessage)
+          }
         }
       }
       result.success(true)
@@ -223,37 +224,45 @@ object UserManagementService {
     result.future
   }
 
-  def updateUser(user: UserDTO, password: Option[String]) : Future[UserResult] = {
+  def updateUser(user: UserDTO, password: Option[String]): Future[UserResult] = {
     val result = Promise[UserResult]
     try {
       val account: Account = client.getResource(user.href.getOrElse(""), classOf[Account])
       account.setSurname(user.lastName)
       account.setGivenName(user.firstName)
       password match {
-        case Some(pwd) => {account.setPassword(pwd)}
+        case Some(pwd) => {
+          account.setPassword(pwd)
+        }
         case None => {}
       }
       account.save()
       // now return this account
-      val groups: List[Group]  = account.getGroups.asScala.toList
+      val groups: List[Group] = account.getGroups.asScala.toList
       var roles: collection.mutable.ListBuffer[String] = ListBuffer()
-      for (g <- groups) {roles.append(g.getName)}
-      val customData: CustomData  = account.getCustomData()
+      for (g <- groups) {
+        roles.append(g.getName)
+      }
+      val customData: CustomData = account.getCustomData()
       // update the custom fields if needed
       user.digitalOceanAccessToken match {
         case Some(accessToken) => {
           customData.put(DIGITAL_OCEAN_ACCESS_TOKEN, accessToken)
         }
-        case None => {customData.remove(DIGITAL_OCEAN_ACCESS_TOKEN)}
+        case None => {
+          customData.remove(DIGITAL_OCEAN_ACCESS_TOKEN)
+        }
       }
       user.awsCredentials match {
         case Some(awsCredentials) => {
           val awsCreds = awsCredentials.toMap
-          awsCreds.foreach {case(key, value) =>
+          awsCreds.foreach { case (key, value) =>
             customData.put(key, value)
           }
         }
-        case None => { customData.remove(AWS_CREDENTIALS) }
+        case None => {
+          customData.remove(AWS_CREDENTIALS)
+        }
       }
 
       customData.save
@@ -276,8 +285,9 @@ object UserManagementService {
       val awsCredentials = AWSCredentials(awsAccessKeyId.getOrElse(""), awsSecretAccessKey.getOrElse(""),
         awsKeyPairName.getOrElse(""), sec)
 
+      // TODO Fix subscriptin
       val updatedUser = User(cid, User.getToken, account.getUsername, List.empty, account.getGivenName,
-        account.getSurname, account.getEmail, account.getHref, customerId, getSubscriptionPlan(customerId),
+        account.getSurname, account.getEmail, account.getHref, customerId, None,
         digitalOceanAccessToken, Some(awsCredentials))
       result.success(Right(updatedUser))
     }
@@ -290,8 +300,7 @@ object UserManagementService {
     result.future
   }
 
-  // sends an email to the user
-  def sendPasswordResetEmail(email: String) : Future[Boolean] = {
+  def sendPasswordResetEmail(email: String): Future[Boolean] = {
     val result = Promise[Boolean]
     try {
       val criteria: AccountCriteria = Accounts.where(Accounts.email().eqIgnoreCase(email))
@@ -302,7 +311,7 @@ object UserManagementService {
         result.success(true)
       }
       else {
-      result.success(false)
+        result.success(false)
       }
     }
     catch {
@@ -314,16 +323,18 @@ object UserManagementService {
     result.future
   }
 
-  def verifyPasswordResetToken(token: String, password: String) : Future[UserResult] = {
+  def verifyPasswordResetToken(token: String, password: String): Future[UserResult] = {
     val result = Promise[UserResult]
     try {
       val account: Account = application.verifyPasswordResetToken(token)
       account.setPassword(password)
       account.save()
-      val groups: List[Group]  = account.getGroups.asScala.toList
+      val groups: List[Group] = account.getGroups.asScala.toList
       var roles: collection.mutable.ListBuffer[String] = ListBuffer()
-      for (g <- groups) {roles.append(g.getName)}
-      val customData: CustomData  = account.getCustomData()
+      for (g <- groups) {
+        roles.append(g.getName)
+      }
+      val customData: CustomData = account.getCustomData()
       val cid: String = customData.get(CLIENT_ID).asInstanceOf[String]
       val customerId: String = customData.get(CUSTOMER_ID).asInstanceOf[String]
       val digitalOceanAccessToken: Option[String] = Option(customData.get(DIGITAL_OCEAN_ACCESS_TOKEN).asInstanceOf[String])
@@ -340,8 +351,9 @@ object UserManagementService {
 
       val awsCredentials = AWSCredentials(awsAccessKeyId.getOrElse(""), awsSecretAccessKey.getOrElse(""),
         awsKeyPairName.getOrElse(""), sec)
+      //TODO Fix me
       result.success(Right(User(cid, User.getToken, account.getUsername, List.empty, account.getGivenName,
-        account.getSurname, account.getEmail, account.getHref, customerId, getSubscriptionPlan(customerId),
+        account.getSurname, account.getEmail, account.getHref, customerId, None,
         digitalOceanAccessToken, Some(awsCredentials))))
     }
     catch {
@@ -353,15 +365,17 @@ object UserManagementService {
     result.future
   }
 
-  def verifyAccountEmail(token: String) : Future[UserResult] = {
+  def verifyAccountEmail(token: String): Future[UserResult] = {
     val result = Promise[UserResult]
     try {
       val account: Account = client.getCurrentTenant.verifyAccountEmail(token)
       // now return this account
-      val groups: List[Group]  = account.getGroups.asScala.toList
+      val groups: List[Group] = account.getGroups.asScala.toList
       var roles: collection.mutable.ListBuffer[String] = ListBuffer()
-      for (g <- groups) {roles.append(g.getName)}
-      val customData: CustomData  = account.getCustomData()
+      for (g <- groups) {
+        roles.append(g.getName)
+      }
+      val customData: CustomData = account.getCustomData()
       val cid: String = customData.get(CLIENT_ID).asInstanceOf[String]
       val customerId: String = customData.get(CUSTOMER_ID).asInstanceOf[String]
       val digitalOceanAccessToken: Option[String] = Option(customData.get(DIGITAL_OCEAN_ACCESS_TOKEN).asInstanceOf[String])
@@ -378,136 +392,18 @@ object UserManagementService {
 
       val awsCredentials = AWSCredentials(awsAccessKeyId.getOrElse(""), awsSecretAccessKey.getOrElse(""),
         awsKeyPairName.getOrElse(""), sec)
+      // TODO Fix me
       result.success(Right(User(cid, User.getToken, account.getUsername, List.empty, account.getGivenName,
-        account.getSurname, account.getEmail, account.getHref, customerId, getSubscriptionPlan(customerId),
+        account.getSurname, account.getEmail, account.getHref, customerId, None,
         digitalOceanAccessToken, Some(awsCredentials))))
     }
     catch {
       case e: Throwable => {
         println(e.getMessage)
-        result.success(Left(UnknownUserError(e.getMessage)))}
+        result.success(Left(UnknownUserError(e.getMessage)))
+      }
     }
     result.future
   }
 
-  private def getCardData(card : CustomerCard) : Map[String, Object] = {
-    Map[String, Object]("number" -> card.number,
-    "exp_month" -> card.expMonth,
-    "exp_year" -> card.expYear,
-    "cvc" -> card.cvc,
-    "name" -> card.name,
-    "address_line1" -> card.address1,
-    "address_line2" -> card.address2,
-    "address_zip" -> card.zip,
-    "address_state" -> card.state,
-    "address_country" -> card.country)
-  }
-
-  def getCreditCard(user: User, cardId: String) : Either[UserError, CustomerCard] = {
-    try {
-      val customer: Customer = Customer.retrieve(user.customerId)
-      Right(CustomerCard.getCustomerCard(customer.getCards.retrieve(cardId)))
-    }
-    catch {
-      case e: Throwable => {
-        { Left(CardError(e.getMessage)) }
-      }
-    }
-  }
-
-  def getCreditCards(user: User) : Either[UserError, List[CustomerCard]] = {
-    try {
-      val customer: Customer = Customer.retrieve(user.customerId)
-      Right(customer.getCards.getData.asScala.toList.map(c => CustomerCard.getCustomerCard(c)))
-    }
-    catch {
-      case e: Throwable => {
-        { Left(CardError(e.getMessage)) }
-      }
-    }
-  }
-
-  def addCreditCard(user: User, card : CustomerCard, default: Boolean) : Either[UserError, CustomerCard] = {
-    try {
-      val customer: Customer = Customer.retrieve(user.customerId)
-      val newCard = customer.createCard(getCardData(card))
-      if (default) { customer.setDefaultCard(newCard.getId)}
-      Right(CustomerCard.getCustomerCard(newCard))
-    }
-    catch {
-      case e: Throwable => {
-        { Left(CardError(e.getMessage)) }
-      }
-    }
-  }
-
-  def updateCreditCard (user: User, cardId: String, cardData: CustomerCard) : Either[UserError, CustomerCard] = {
-    try {
-      val customer: Customer = Customer.retrieve(user.customerId)
-      val targetCard = customer.getCards.retrieve(cardId)
-      targetCard.update(cardData.getMutableData)
-      Right(CustomerCard.getCustomerCard(targetCard))
-    }
-    catch {
-      case e: Throwable => {
-        { Left(CardError(e.getMessage)) }
-      }
-    }
-  }
-
-  def removeCreditCard(user: User, cardId : String) : Either[UserError, CustomerCard] = {
-    try {
-      val customer: Customer = Customer.retrieve(user.customerId)
-      if ((customer.getCards.all(null).getCount == 1) && (SubscriptionPlan.isPaidAccount(user.plan))) {
-        Left(CardError("Premium Subscription requires at least one card"))
-      } else {
-        val card = customer.getCards.retrieve(cardId)
-        card.delete()
-        Right(CustomerCard.getCustomerCard(card))
-      }
-    }
-    catch {
-      case e: Throwable => {
-        { Left(CardError(e.getMessage)) }
-      }
-    }
-  }
-
-  def changePlan(user: User, newPlan : SubscriptionPlan.Value, card : Option[CustomerCard]) : UserResult = {
-    if (user.plan.equals(newPlan)) { Left(PlanError("User is already subscribed to plan")) } else {
-      try {
-        val customer: Customer = Customer.retrieve(user.customerId)
-        if (card.isDefined) {
-          customer.createCard(getCardData(card.get))
-        } else {
-          if ((SubscriptionPlan.isPaidAccount(newPlan)) && (customer.getDefaultCard.equals("") || customer.getDefaultCard == null)) {
-            Left(PlanError("Premium subscription plans require a default card"))
-          }
-        }
-        // now update the plan
-        val subs: CustomerSubscriptionCollection  = customer.getSubscriptions().all(null)
-        if (subs.getCount > 0) {
-          val subscription : Subscription = subs.getData.get(0)
-          subscription.getPlan.update(Map("name" -> newPlan.toString))
-          Right(user.copy(plan = newPlan))
-        } else { Left(PlanError("User subscription not found. please contact support.")) }
-      }
-      catch {
-        case e: Throwable => {
-          { Left(PlanError(e.getMessage)) }
-        }
-      }
-    }
-  }
-
-  def getInvoices(user: User, limit : Int = 12) : Either[UserError, List[CustomerInvoice]]  = {
-    try {
-      Right(Invoice.all(Map[String, Object]("customer" -> user.customerId, "count" -> new java.lang.Integer(limit))).getData.asScala.toList.map(i => CustomerInvoice.getCustomerInvoice(i)))
-    }
-    catch {
-      case e: Throwable => {
-        { Left(InvoiceError(e.getMessage)) }
-      }
-    }
-  }
 }
