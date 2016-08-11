@@ -171,23 +171,7 @@ case class CardError(message: String) extends SubscriptionError
 
 case class InvoiceError(message: String) extends SubscriptionError
 
-object SubscriptionService {
-  val config = ConfigFactory.load
-
-  private def getSafeString(key: String): String = {
-    val s = try {
-      config.getString(key)
-    }
-    catch {
-      case e: ConfigException.Missing => {
-        ""
-      }
-    }
-    s
-  }
-
-  Stripe.apiKey = getSafeString("stripe-api-key")
-
+trait NimbleusSubscription {
   def addCreditCard(customerId: String, cardToken: String, default: Boolean = false): Either[SubscriptionError, String] = {
     try {
       val customer: Customer = Customer.retrieve(customerId)

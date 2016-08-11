@@ -14,7 +14,8 @@ import com.typesafe.config.{ConfigException, ConfigFactory}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 
-class SubscriptionRouteSpec extends WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with ScalaFutures {
+class SubscriptionRouteSpec extends WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with ScalaFutures
+         with NimbleusSubscription {
   private val USER_USERNAME = "cstewart@nimbleus.com"
   private val USER_FIRST_NAME = "Craig"
   private val USER_LAST_NAME = "Stewart"
@@ -104,7 +105,7 @@ class SubscriptionRouteSpec extends WordSpecLike with Matchers with BeforeAndAft
         defaultTokenParams.put("card", defaultCardParams)
 
         val cardToken: Token = Token.create(defaultTokenParams)
-        val addCardResult = SubscriptionService.addCreditCard(newUser.customerId, cardToken.getId)
+        val addCardResult = addCreditCard(newUser.customerId, cardToken.getId)
 
         addCardResult should be ('Right)
         addCardResult.right.get.length should be > 0
@@ -144,7 +145,7 @@ class SubscriptionRouteSpec extends WordSpecLike with Matchers with BeforeAndAft
         defaultTokenParams.put("card", defaultCardParams)
 
         val cardToken: Token = Token.create(defaultTokenParams)
-        val addCardResult = SubscriptionService.addCreditCard(newUser.customerId, cardToken.getId)
+        val addCardResult = addCreditCard(newUser.customerId, cardToken.getId)
 
         addCardResult should be ('Right)
         addCardResult.right.get.length should be > 0
@@ -153,7 +154,7 @@ class SubscriptionRouteSpec extends WordSpecLike with Matchers with BeforeAndAft
         val card: Card = customer.getSources().retrieve(addCardResult.right.get).asInstanceOf[Card]
 
         // delete the card
-        val removeCardResult = SubscriptionService.removeCreditCard(newUser.customerId, card.getId)
+        val removeCardResult = removeCreditCard(newUser.customerId, card.getId)
         removeCardResult should be ('Right)
         removeCardResult.right.get should be (true)
 
@@ -194,7 +195,7 @@ class SubscriptionRouteSpec extends WordSpecLike with Matchers with BeforeAndAft
         defaultTokenParams.put("card", defaultCardParams)
 
         val cardToken: Token = Token.create(defaultTokenParams)
-        val addCardResult = SubscriptionService.addCreditCard(newUser.customerId, cardToken.getId)
+        val addCardResult = addCreditCard(newUser.customerId, cardToken.getId)
 
         addCardResult should be ('Right)
         addCardResult.right.get.length should be > 0
@@ -214,7 +215,7 @@ class SubscriptionRouteSpec extends WordSpecLike with Matchers with BeforeAndAft
         updateParams.put("exp_year", 2030.asInstanceOf[Object])
         updateParams.put("name", "Craig Stewart")
 
-        val updateCardResult = SubscriptionService.updateCreditCard(newUser.customerId, card.getId, updateParams)
+        val updateCardResult = updateCreditCard(newUser.customerId, card.getId, updateParams)
 
         updateCardResult should be ('Right)
         val updatedCard = updateCardResult.right.get
@@ -230,7 +231,7 @@ class SubscriptionRouteSpec extends WordSpecLike with Matchers with BeforeAndAft
         updatedCard.name should be (Some("Craig Stewart"))
 
         // delete the card
-        val removeCardResult = SubscriptionService.removeCreditCard(newUser.customerId, card.getId)
+        val removeCardResult = removeCreditCard(newUser.customerId, card.getId)
         removeCardResult should be ('Right)
         removeCardResult.right.get should be (true)
 
@@ -271,11 +272,11 @@ class SubscriptionRouteSpec extends WordSpecLike with Matchers with BeforeAndAft
         defaultTokenParams.put("card", defaultCardParams)
 
         val cardToken: Token = Token.create(defaultTokenParams)
-        val addCardResult = SubscriptionService.addCreditCard(newUser.customerId, cardToken.getId)
+        val addCardResult = addCreditCard(newUser.customerId, cardToken.getId)
         addCardResult should be ('Right)
         addCardResult.right.get.length should be > 0
 
-        val findResult = SubscriptionService.getCreditCard(newUser.customerId, addCardResult.right.get)
+        val findResult = getCreditCard(newUser.customerId, addCardResult.right.get)
         findResult should be ('Right)
         val foundCard = findResult.right.get
 
@@ -285,7 +286,7 @@ class SubscriptionRouteSpec extends WordSpecLike with Matchers with BeforeAndAft
         foundCard.expYear should be (Some(2020))
 
         // delete the card
-        val removeCardResult = SubscriptionService.removeCreditCard(newUser.customerId, foundCard.id)
+        val removeCardResult = removeCreditCard(newUser.customerId, foundCard.id)
         removeCardResult should be ('Right)
         removeCardResult.right.get should be (true)
 
@@ -319,7 +320,7 @@ class SubscriptionRouteSpec extends WordSpecLike with Matchers with BeforeAndAft
         val defaultTokenParams: util.Map[String, Object] = new util.HashMap[String, Object]()
         defaultTokenParams.put("card", defaultCardParams)
         val cardToken: Token = Token.create(defaultTokenParams)
-        val addCardResult = SubscriptionService.addCreditCard(newUser.customerId, cardToken.getId)
+        val addCardResult = addCreditCard(newUser.customerId, cardToken.getId)
         addCardResult should be ('Right)
         addCardResult.right.get.length should be > 0
 
@@ -338,18 +339,18 @@ class SubscriptionRouteSpec extends WordSpecLike with Matchers with BeforeAndAft
         val defaultTokenParams2: util.Map[String, Object] = new util.HashMap[String, Object]()
         defaultTokenParams2.put("card", defaultCardParams2)
         val cardToken2: Token = Token.create(defaultTokenParams2)
-        val addCardResult2 = SubscriptionService.addCreditCard(newUser.customerId, cardToken2.getId)
+        val addCardResult2 = addCreditCard(newUser.customerId, cardToken2.getId)
         addCardResult2 should be ('Right)
         addCardResult2.right.get.length should be > 0
 
-        val findResult = SubscriptionService.getCreditCards(newUser.customerId)
+        val findResult = getCreditCards(newUser.customerId)
         findResult should be ('Right)
         val foundCards = findResult.right.get
         foundCards.length should be (2)
 
         for (card <- foundCards) {
           // delete all the cards
-          val removeCardResult = SubscriptionService.removeCreditCard(newUser.customerId, card.id)
+          val removeCardResult = removeCreditCard(newUser.customerId, card.id)
           removeCardResult should be ('Right)
           removeCardResult.right.get should be (true)
         }
@@ -387,7 +388,7 @@ class SubscriptionRouteSpec extends WordSpecLike with Matchers with BeforeAndAft
         defaultTokenParams.put("card", defaultCardParams)
 
         val cardToken: Token = Token.create(defaultTokenParams)
-        val addCardResult = SubscriptionService.addCreditCard(newUser.customerId, cardToken.getId)
+        val addCardResult = addCreditCard(newUser.customerId, cardToken.getId)
 
         addCardResult should be ('Right)
         addCardResult.right.get.length should be > 0
@@ -396,18 +397,18 @@ class SubscriptionRouteSpec extends WordSpecLike with Matchers with BeforeAndAft
         val card: Card = customer.getSources().retrieve(addCardResult.right.get).asInstanceOf[Card]
 
         // create subscription
-        val subscriptionResult = SubscriptionService.changePlan(newUser.customerId, Some("NAC_GOLD"))
+        val subscriptionResult = changePlan(newUser.customerId, Some("NAC_GOLD"))
         subscriptionResult should be ('Right)
         subscriptionResult.right.get.get.length should be > 0
         val subscriptionId = subscriptionResult.right.get.get
 
         // delete subscription
-        val cancelSubscriptionResult = SubscriptionService.changePlan(newUser.customerId, None)
+        val cancelSubscriptionResult = changePlan(newUser.customerId, None)
         cancelSubscriptionResult should be ('Right)
         cancelSubscriptionResult.right.get should be (None)
 
         // delete the card
-        val removeCardResult = SubscriptionService.removeCreditCard(newUser.customerId, card.getId)
+        val removeCardResult = removeCreditCard(newUser.customerId, card.getId)
         removeCardResult should be ('Right)
         removeCardResult.right.get should be (true)
 
@@ -449,7 +450,7 @@ class SubscriptionRouteSpec extends WordSpecLike with Matchers with BeforeAndAft
         defaultTokenParams.put("card", defaultCardParams)
 
         val cardToken: Token = Token.create(defaultTokenParams)
-        val addCardResult = SubscriptionService.addCreditCard(newUser.customerId, cardToken.getId)
+        val addCardResult = addCreditCard(newUser.customerId, cardToken.getId)
 
         addCardResult should be ('Right)
         addCardResult.right.get.length should be > 0
@@ -458,23 +459,23 @@ class SubscriptionRouteSpec extends WordSpecLike with Matchers with BeforeAndAft
         val card: Card = customer.getSources().retrieve(addCardResult.right.get).asInstanceOf[Card]
 
         // create subscription
-        val subscriptionResult = SubscriptionService.changePlan(newUser.customerId, Some("NAC_GOLD"))
+        val subscriptionResult = changePlan(newUser.customerId, Some("NAC_GOLD"))
         subscriptionResult should be ('Right)
         subscriptionResult.right.get.get.length should be > 0
         val subscriptionId = subscriptionResult.right.get.get
 
         // get the subscription
-        val subscription = SubscriptionService.getSubscriptionPlan(newUser.customerId)
+        val subscription = getSubscriptionPlan(newUser.customerId)
         subscription should be ('defined)
         subscription.get.id should be (subscriptionId)
 
         // delete subscription
-        val cancelSubscriptionResult = SubscriptionService.changePlan(newUser.customerId, None)
+        val cancelSubscriptionResult = changePlan(newUser.customerId, None)
         cancelSubscriptionResult should be ('Right)
         cancelSubscriptionResult.right.get should be (None)
 
         // delete the card
-        val removeCardResult = SubscriptionService.removeCreditCard(newUser.customerId, card.getId)
+        val removeCardResult = removeCreditCard(newUser.customerId, card.getId)
         removeCardResult should be ('Right)
         removeCardResult.right.get should be (true)
 
@@ -516,7 +517,7 @@ class SubscriptionRouteSpec extends WordSpecLike with Matchers with BeforeAndAft
         defaultTokenParams.put("card", defaultCardParams)
 
         val cardToken: Token = Token.create(defaultTokenParams)
-        val addCardResult = SubscriptionService.addCreditCard(newUser.customerId, cardToken.getId)
+        val addCardResult = addCreditCard(newUser.customerId, cardToken.getId)
 
         addCardResult should be ('Right)
         addCardResult.right.get.length should be > 0
@@ -525,23 +526,23 @@ class SubscriptionRouteSpec extends WordSpecLike with Matchers with BeforeAndAft
         val card: Card = customer.getSources().retrieve(addCardResult.right.get).asInstanceOf[Card]
 
         // create subscription
-        val subscriptionResult = SubscriptionService.changePlan(newUser.customerId, Some("NAC_GOLD"))
+        val subscriptionResult = changePlan(newUser.customerId, Some("NAC_GOLD"))
         subscriptionResult should be ('Right)
         subscriptionResult.right.get.get.length should be > 0
         val subscriptionId = subscriptionResult.right.get.get
 
         // get the invoice
-        val getInvoicesResult = SubscriptionService.getInvoices(newUser.customerId, 1)
+        val getInvoicesResult = getInvoices(newUser.customerId, 1)
         getInvoicesResult should be ('Right)
         getInvoicesResult.right.get.length should equal(1)
 
         // delete subscription
-        val cancelSubscriptionResult = SubscriptionService.changePlan(newUser.customerId, None)
+        val cancelSubscriptionResult = changePlan(newUser.customerId, None)
         cancelSubscriptionResult should be ('Right)
         cancelSubscriptionResult.right.get should be (None)
 
         // delete the card
-        val removeCardResult = SubscriptionService.removeCreditCard(newUser.customerId, card.getId)
+        val removeCardResult = removeCreditCard(newUser.customerId, card.getId)
         removeCardResult should be ('Right)
         removeCardResult.right.get should be (true)
 
