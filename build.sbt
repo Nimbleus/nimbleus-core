@@ -6,6 +6,8 @@ version := Versions.app
 
 scalaVersion := "2.11.7"
 
+// developers will only have read only access to the artifacts
+// dev-ops will have full publishing rights
 credentials += Credentials(
   if (Path(Path.userHome + "/.sbt/.nimbleus-artifactory-creds").exists) {
     new File(Path.userHome, ".sbt/.nimbleus-artifactory-creds")
