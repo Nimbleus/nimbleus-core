@@ -6,19 +6,19 @@ version := Versions.app
 
 scalaVersion := "2.11.7"
 
-resolvers ++= Seq("Nimbleus Releases" at "https://repository-nimbleus.forge.cloudbees.com/release/", "Nimbleus Snapshots" at "https://repository-nimbleus.forge.cloudbees.com/snapshot/")
+credentials += Credentials(new File(Path.userHome, ".sbt/.nimbleus-artifactory-creds"))
 
-credentials += Credentials(
-  if (Path("/private/nimbleus/repository.credentials").exists) new File("/private/nimbleus/repository.credentials")
-  else new File(Path.userHome, ".sbt/.nimbleus-credentials"))
+val localRelease  = "local-release"  at "https://nimbleus.jfrog.io/nimbleus/libs-release-local"
+val localSnapshot = "local-snapshot" at "https://nimbleus.jfrog.io/nimbleus/libs-snapshot-local"
 
 publishTo := {
-  val nimbleus = "https://repository-nimbleus.forge.cloudbees.com/"
   if (Versions.app.trim.endsWith("SNAPSHOT"))
-    Some("snapshots" at nimbleus + "snapshot/")
+    Some(localSnapshot)
   else
-    Some("releases"  at nimbleus + "release/")
+    Some(localRelease)
 }
+
+publishArtifact in Test := false
 
 resolvers += Resolvers.ossSonatypeReleases
 

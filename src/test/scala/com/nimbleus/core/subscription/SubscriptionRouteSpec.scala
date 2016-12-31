@@ -300,7 +300,7 @@ class SubscriptionRouteSpec extends WordSpecLike with Matchers with BeforeAndAft
         }
       }
     }
-    "create user then add 2 cards then list and remove cardsremove cards" in {
+    "create user then add 2 cards then list and remove cards remove cards" in {
       val userFuture = UserManagementService.createUser(user, USER_PASSWORD)
       whenReady(userFuture) { result =>
         result should be ('right)

@@ -1,10 +1,10 @@
 package com.nimbleus.core.subscription
 
 import java.util
-import com.stripe.Stripe
+
 import com.stripe.model._
-import com.typesafe.config.{ConfigException, ConfigFactory}
 import org.joda.time.DateTime
+
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 
