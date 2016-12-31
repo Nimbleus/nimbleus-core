@@ -6,7 +6,7 @@ version := Versions.app
 
 scalaVersion := "2.11.7"
 
-credentials += Credentials(new File(Path.userHome, ".sbt/.nimbleus-artifactory-creds"))
+credentials += Credentials(new File(Path.userHome, ".nimbleus-artifactory-creds"))
 
 val localRelease  = "local-release"  at "https://nimbleus.jfrog.io/nimbleus/libs-release-local"
 val localSnapshot = "local-snapshot" at "https://nimbleus.jfrog.io/nimbleus/libs-snapshot-local"
