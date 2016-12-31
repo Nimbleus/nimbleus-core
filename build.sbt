@@ -10,7 +10,7 @@ credentials += Credentials(
   if (Path(Path.userHome + "/.sbt/.nimbleus-artifactory-creds").exists) {
     new File(Path.userHome, ".sbt/.nimbleus-artifactory-creds")
   } else {
-    new File(".nimbleus-artifactory-creds")
+    new File("./.nimbleus-artifactory-creds")
   }
 )
 
